@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulare Algoritmi de Planificare</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .results p {
+            background: #f9f9f9;
+            padding: 10px;
+            border-left: 4px solid #007BFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simulare Algoritmi de Planificare</h1>
+        <label for="algorithm">Alege algoritmul:</label>
+        <select id="algorithm">
+            <option value="fcfs">Primul venit, primul realizat (FCFS)</option>
+            <option value="sjf">Cel mai scurt proces primul (SJF)</option>
+            <option value="srtf">Cel mai scurt timp rămas (SRTF)</option>
+            <option value="rr">Round Robin (RR)</option>
+            <option value="priority">Planificare pe bază de prioritate</option>
+        </select>
+
+        <label for="processes">Introdu procesele (format: P1,5 P2,9):</label>
+        <input type="text" id="processes" placeholder="Exemplu: A,4 B,8 C,6">
+
+        <label for="quantum">Cuant de timp (dacă este necesar pentru RR):</label>
+        <input type="number" id="quantum" placeholder="Exemplu: 4">
+
+        <label for="priorities">Priorități (doar pentru algoritmul cu priorități, format: P1,1 P2,2):</label>
+        <input type="text" id="priorities" placeholder="Exemplu: A,3 B,1">
+
+        <button onclick="calculate()">Calculează</button>
+
+        <div class="results">
+            <h3>Rezultate:</h3>
+            <pre id="output"></pre>
+        </div>
+    </div>
+
+    <script>
+        function calculate() {
+            const algorithm = document.getElementById("algorithm").value;
+            const processInput = document.getElementById("processes").value.trim();
+            const quantum = parseInt(document.getElementById("quantum").value) || 0;
+            const priorityInput = document.getElementById("priorities").value.trim();
+
+            if (!processInput) {
+                alert("Introdu procesele corespunzător (format: NumeProces,Timp).");
+                return;
+            }
+
+            let processes = processInput.split(" ").map(p => {
+                const [name, time] = p.split(",");
+                const parsedTime = parseInt(time);
+                
+                if (!name || isNaN(parsedTime) || parsedTime <= 0) {
+                    alert(`Timp invalid sau format incorect pentru procesul ${name}`);
+                    return null;
+                }
+                
+                return { name, time: parsedTime, remainingTime: parsedTime, priority: 0, completionTime: 0, waitingTime: 0, turnaroundTime: 0 };
+            }).filter(p => p !== null);
+
+            if (priorityInput) {
+                const priorities = priorityInput.split(" ").reduce((acc, p) => {
+                    const [name, priority] = p.split(",");
+                    const parsedPriority = parseInt(priority);
+                    if (isNaN(parsedPriority)) {
+                        alert(`Prioritate invalidă pentru procesul ${name}`);
+                    }
+                    acc[name] = parsedPriority;
+                    return acc;
+                }, {});
+                processes.forEach(p => {
+                    p.priority = priorities[p.name] || 0;
+                });
+            }
+
+            let result = "";
+            try {
+                switch (algorithm) {
+                    case "fcfs":
+                        result = fcfs(processes);
+                        break;
+                    case "sjf":
+                        result = sjf(processes);
+                        break;
+                    case "srtf":
+                        result = srtf(processes);
+                        break;
+                    case "rr":
+                        result = rr(processes, quantum);
+                        break;
+                    case "priority":
+                        result = priority(processes);
+                        break;
+                    default:
+                        result = "Algoritm invalid.";
+                }
+            } catch (error) {
+                result = `Eroare: ${error.message}`;
+            }
+
+            document.getElementById("output").innerText = result;
+        }
+
+        function fcfs(processes) {
+            let currentTime = 0;
+            let totalWaitingTime = 0;
+            let totalTurnaroundTime = 0;
+
+            processes.forEach(p => {
+                p.waitingTime = currentTime;
+                p.turnaroundTime = p.waitingTime + p.time;
+                p.completionTime = p.turnaroundTime;
+                totalWaitingTime += p.waitingTime;
+                totalTurnaroundTime += p.turnaroundTime;
+                currentTime += p.time;
+            });
+
+            const avgWaitingTime = totalWaitingTime / processes.length;
+            const avgTurnaroundTime = totalTurnaroundTime / processes.length;
+            const order = processes.map(p => p.name).join(" ");
+
+            return `Ordinea: ${order}\nTimp mediu de așteptare: ${avgWaitingTime.toFixed(2)}\nTimp mediu de turnaround: ${avgTurnaroundTime.toFixed(2)}`;
+        }
+
+        function sjf(processes) {
+            processes.sort((a, b) => a.time - b.time);
+            return fcfs(processes);
+        }
+
+        function srtf(processes) {
+            let time = 0;
+            let totalWaitingTime = 0;
+            let totalTurnaroundTime = 0;
+            const order = [];
+
+            while (processes.some(p => p.remainingTime > 0)) {
+                const availableProcesses = processes.filter(p => p.remainingTime > 0);
+                availableProcesses.sort((a, b) => a.remainingTime - b.remainingTime);
+
+                const current = availableProcesses[0];
+                order.push(current.name);
+                current.remainingTime -= 1;
+                time++;
+
+                if (current.remainingTime === 0) {
+                    current.completionTime = time;
+                    current.turnaroundTime = current.completionTime;
+                    current.waitingTime = current.turnaroundTime - current.time;
+                    totalWaitingTime += current.waitingTime;
+                    totalTurnaroundTime += current.turnaroundTime;
+                }
+            }
+
+            const avgWaitingTime = totalWaitingTime / processes.length;
+            const avgTurnaroundTime = totalTurnaroundTime / processes.length;
+
+            return `Ordinea: ${order.join(" ")}\nTimp mediu de așteptare: ${avgWaitingTime.toFixed(2)}\nTimp mediu de turnaround: ${avgTurnaroundTime.toFixed(2)}`;
+        }
+
+        function rr(processes, quantum) {
+            if (quantum <= 0) {
+                alert("Cuantul de timp trebuie să fie un număr pozitiv.");
+                return;
+            }
+
+            let time = 0;
+            let totalWaitingTime = 0;
+            let totalTurnaroundTime = 0;
+            const order = [];
+            const queue = [...processes];
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                if (current.remainingTime > quantum) {
+                    time += quantum;
+                    current.remainingTime -= quantum;
+                    queue.push(current);
+                    order.push(current.name);
+                } else {
+                    time += current.remainingTime;
+                    current.completionTime = time;
+                    current.turnaroundTime = current.completionTime;
+                    current.waitingTime = current.turnaroundTime - current.time;
+                    totalWaitingTime += current.waitingTime;
+                    totalTurnaroundTime += current.turnaroundTime;
+                    order.push(current.name);
+                }
+            }
+
+            const avgWaitingTime = totalWaitingTime / processes.length;
+            const avgTurnaroundTime = totalTurnaroundTime / processes.length;
+
+            return `Ordinea: ${order.join(" ")}\nTimp mediu de așteptare: ${avgWaitingTime.toFixed(2)}\nTimp mediu de turnaround: ${avgTurnaroundTime.toFixed(2)}`;
+        }
+
+        function priority(processes) {
+            processes.sort((a, b) => b.priority - a.priority);
+            return fcfs(processes);
+        }
+    </script>
+</body>
+</html>

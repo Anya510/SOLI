@@ -1,0 +1,11 @@
+# Folosește o imagine oficială Nginx ca bază
+FROM nginx:alpine
+
+# Copiază fișierul HTML în directorul corespunzător din container
+COPY ./index.html /usr/share/nginx/html/index.html
+
+# Expune portul pe care Nginx rulează (80)
+EXPOSE 80
+
+# Comanda implicită care pornește serverul Nginx
+CMD ["nginx", "-g", "daemon off;"]
